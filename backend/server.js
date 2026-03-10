@@ -14,7 +14,7 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://gym-softwarefrontend.onrender.com', 'https://your-frontend-url.onrender.com']  // Update with your actual frontend URL
+    ? ['https://gym-softwarefrontend.onrender.com']  // Update with your actual frontend URL
     : 'http://localhost:3000'
 }));
 app.use(express.json());

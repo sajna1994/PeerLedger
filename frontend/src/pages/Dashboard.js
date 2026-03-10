@@ -55,7 +55,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, API_URL]);
 
   useEffect(() => {
     fetchDashboardData();
