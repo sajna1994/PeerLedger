@@ -6,13 +6,15 @@ import {
   BookOpen, TrendingUp, TrendingDown, CheckCircle, 
   Clock, Search, Filter, Download, 
   ArrowUpRight, ArrowDownLeft, XCircle,
-  Eye, EyeOff, ChevronDown, Menu, X
+  Eye, EyeOff, ChevronDown, Menu, X,
+  PieChart, BarChart3, List, Layers
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Pagination from '../components/Pagination';
 
 const Ledger = () => {
   const { token } = useAuth();
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
@@ -22,6 +24,11 @@ const Ledger = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [dateRange, setDateRange] = useState('all');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   const [summary, setSummary] = useState({
     totalDebit: 0,
     totalCredit: 0,
@@ -46,7 +53,7 @@ const Ledger = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, API_URL]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
@@ -92,9 +99,69 @@ const Ledger = () => {
     return searchMatch && filterByDate(t);
   });
 
+  // Pagination logic
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateRange, viewMode]);
+
   const getPartyName = (t) => {
     return t.type === 'lend' ? t.borrower?.name : t.lender?.name;
   };
+
+  // Format date to DD/MM/YYYY
+  const formatDate = (date) => {
+    return format(new Date(date), 'dd/MM/yyyy');
+  };
+
+  // Format date for display in different contexts
+  const formatDisplayDate = (date) => {
+    return format(new Date(date), 'dd MMM yyyy');
+  };
+
+  // Prepare data for Summary View
+  const getPartyTypeBreakdown = () => {
+    const userTransactions = transactions.filter(t => 
+      t.lenderModel === 'User' || t.borrowerModel === 'User'
+    ).length;
+    
+    const externalTransactions = transactions.filter(t => 
+      t.lenderModel === 'ExternalParty' || t.borrowerModel === 'ExternalParty'
+    ).length;
+    
+    return { userTransactions, externalTransactions };
+  };
+
+  const getMonthlyTrend = () => {
+    const last6Months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthYear = format(date, 'MMM yyyy');
+      last6Months.push(monthYear);
+    }
+    
+    return last6Months.map(month => {
+      const monthTransactions = transactions.filter(t => 
+        format(new Date(t.createdAt), 'MMM yyyy') === month
+      );
+      
+      return {
+        month,
+        debit: monthTransactions.filter(t => t.type === 'lend').reduce((sum, t) => sum + t.amount, 0),
+        credit: monthTransactions.filter(t => t.type === 'borrow').reduce((sum, t) => sum + t.amount, 0)
+      };
+    });
+  };
+
+  const { userTransactions, externalTransactions } = getPartyTypeBreakdown();
+  const monthlyTrend = getMonthlyTrend();
 
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
@@ -105,48 +172,57 @@ const Ledger = () => {
   return (
     <div className="mx-auto max-w-7xl p-3 sm:p-4 bg-slate-50 min-h-screen">
       
-      {/* Header with Logo - Mobile Responsive */}
+      {/* Header with Logo */}
       <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
-        <div className="p-2 sm:p-3 bg-gradient-to-br  rounded-lg sm:rounded-xl shadow-lg">
-<BookOpen className="text-blue-600 w-5 h-5 sm:w-7 sm:h-7" />        </div>
+        <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg sm:rounded-xl shadow-lg">
+          <BookOpen className="text-white w-5 h-5 sm:w-7 sm:h-7" />
+        </div>
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-800 tracking-tight"><span className='bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text'>Peer</span><span className='text-gray-800'></span>Ledger</h1>
-          <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">Track your Debits & Credits</p>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-800 tracking-tight">
+            <span className='bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text'>Peer</span>
+            <span className='text-gray-800'>Ledger</span>
+          </h1>
+          <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Track your Debits & Credits
+          </p>
         </div>
       </div>
 
-      {/* View Toggle Buttons - Mobile Responsive */}
+      {/* View Toggle Buttons */}
       <div className="flex flex-wrap items-center gap-2 mb-4 sm:mb-6">
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           <button 
             onClick={() => setViewMode('ledger')}
-            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex-1 sm:flex-none ${
+            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1 sm:gap-2 ${
               viewMode === 'ledger' 
                 ? 'bg-blue-600 text-white shadow-md' 
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            Ledger
+            <Layers size={16} />
+            <span>Ledger</span>
           </button>
           <button 
             onClick={() => setViewMode('summary')}
-            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex-1 sm:flex-none ${
+            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1 sm:gap-2 ${
               viewMode === 'summary' 
                 ? 'bg-blue-600 text-white shadow-md' 
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            Summary
+            <PieChart size={16} />
+            <span>Summary</span>
           </button>
           <button 
             onClick={() => setViewMode('transactions')}
-            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex-1 sm:flex-none ${
+            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1 sm:gap-2 ${
               viewMode === 'transactions' 
                 ? 'bg-blue-600 text-white shadow-md' 
                 : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            Transactions
+            <List size={16} />
+            <span>Transactions</span>
           </button>
         </div>
         
@@ -169,7 +245,7 @@ const Ledger = () => {
         </button>
       </div>
 
-      {/* Search and Filter Bar - Mobile Responsive */}
+      {/* Search and Filter Bar */}
       <div className="space-y-3 mb-4 sm:mb-6">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -191,7 +267,7 @@ const Ledger = () => {
           <ChevronDown size={18} className={`transform transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
         </button>
 
-        {/* Filter Options - Responsive */}
+        {/* Filter Options */}
         <div className={`${showMobileFilters ? 'block' : 'hidden lg:flex'} flex-col lg:flex-row items-center gap-3`}>
           <select 
             value={dateRange}
@@ -213,151 +289,362 @@ const Ledger = () => {
         </div>
       </div>
 
-      {/* Main Content - Responsive Layout */}
+      {/* Main Content - Different Views Based on viewMode */}
       <div className={`grid gap-6 ${
         (showSummary || showMobileSummary) ? 'grid-cols-1 lg:grid-cols-4' : 'grid-cols-1'
       }`}>
         
-        {/* LEDGER TABLE SECTION */}
+        {/* MAIN CONTENT AREA - Changes based on viewMode */}
         <div className={`${(showSummary || showMobileSummary) ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* Mobile Card View */}
-            <div className="block lg:hidden">
-              {filteredData.length > 0 ? (
-                filteredData.map((t) => (
-                  <div key={t._id} className="p-4 border-b border-slate-100 hover:bg-slate-50">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <span className="text-xs text-slate-500 font-mono">
-                          {format(new Date(t.createdAt), 'MM/dd/yyyy')}
+          
+          {/* LEDGER VIEW */}
+          {viewMode === 'ledger' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+                <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                  <Layers size={18} className="text-blue-600" />
+                  Detailed Ledger
+                </h2>
+              </div>
+              
+              {/* Mobile Card View */}
+              <div className="block lg:hidden">
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((t) => (
+                    <div key={t._id} className="p-4 border-b border-slate-100 hover:bg-slate-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="text-xs text-slate-500 font-mono">
+                            {formatDate(t.createdAt)}
+                          </span>
+                          <h3 className="font-medium text-slate-800 mt-1">{t.description}</h3>
+                          <p className="text-xs text-slate-500">With: {getPartyName(t)}</p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          t.status === 'settled' ? 'bg-green-100 text-green-700' :
+                          t.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {t.status === 'settled' && <CheckCircle size={10} />}
+                          {t.status === 'pending' && <Clock size={10} />}
+                          {t.status === 'overdue' && <XCircle size={10} />}
+                          {t.status === 'settled' ? 'Settled' :
+                           t.status === 'pending' ? 'Pending' : 'Failed'}
                         </span>
-                        <h3 className="font-medium text-slate-800 mt-1">{t.description}</h3>
-                        <p className="text-xs text-slate-500">With: {getPartyName(t)}</p>
                       </div>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                        t.status === 'settled' ? 'bg-green-100 text-green-700' :
-                        t.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {t.status === 'settled' && <CheckCircle size={10} />}
-                        {t.status === 'pending' && <Clock size={10} />}
-                        {t.status === 'overdue' && <XCircle size={10} />}
-                        {t.status === 'settled' ? 'Settled' :
-                         t.status === 'pending' ? 'Pending' : 'Failed'}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div className="bg-red-50 p-2 rounded-lg">
-                        <span className="text-[10px] text-red-600 font-medium uppercase">Debit</span>
-                        {t.type === 'lend' ? (
-                          <p className="text-sm font-bold text-red-600 flex items-center gap-1">
-                            <ArrowDownLeft size={12} />
-                            ₹{t.amount.toLocaleString('en-IN')}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-slate-400">—</p>
-                        )}
+                      
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <div className="bg-red-50 p-2 rounded-lg">
+                          <span className="text-[10px] text-red-600 font-medium uppercase">Debit</span>
+                          {t.type === 'lend' ? (
+                            <p className="text-sm font-bold text-red-600 flex items-center gap-1">
+                              <ArrowDownLeft size={12} />
+                              ₹{t.amount.toLocaleString('en-IN')}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-slate-400">—</p>
+                          )}
+                        </div>
+                        <div className="bg-emerald-50 p-2 rounded-lg">
+                          <span className="text-[10px] text-emerald-600 font-medium uppercase">Credit</span>
+                          {t.type === 'borrow' ? (
+                            <p className="text-sm font-bold text-emerald-600 flex items-center gap-1">
+                              <ArrowUpRight size={12} />
+                              ₹{t.amount.toLocaleString('en-IN')}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-slate-400">—</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="bg-emerald-50 p-2 rounded-lg">
-                        <span className="text-[10px] text-emerald-600 font-medium uppercase">Credit</span>
-                        {t.type === 'borrow' ? (
-                          <p className="text-sm font-bold text-emerald-600 flex items-center gap-1">
-                            <ArrowUpRight size={12} />
-                            ₹{t.amount.toLocaleString('en-IN')}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-slate-400">—</p>
-                        )}
+                      
+                      <div className="mt-2 text-right">
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                          t.type === 'lend' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          {t.type === 'lend' ? 'Debit' : 'Credit'}
+                        </span>
                       </div>
                     </div>
-                    
-                    <div className="mt-2 text-right">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        t.type === 'lend' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-                      }`}>
-                        {t.type === 'lend' ? 'Debit' : 'Credit'}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-8 text-center text-slate-500">No transactions found</div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-slate-500">No transactions found</div>
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+                      <th className="p-4 text-left text-xs font-semibold text-slate-600 uppercase">Date (DD/MM/YYYY)</th>
+                      <th className="p-4 text-left text-xs font-semibold text-slate-600 uppercase">Description</th>
+                      <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase">Debit</th>
+                      <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase">Credit</th>
+                      <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase">Type</th>
+                      <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((t) => (
+                        <tr key={t._id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 text-slate-600 font-mono text-xs">
+                            {formatDate(t.createdAt)}
+                          </td>
+                          <td className="p-4">
+                            <div className="font-medium text-slate-800">{t.description}</div>
+                            <div className="text-xs text-slate-500 mt-0.5">With: {getPartyName(t)}</div>
+                          </td>
+                          <td className="p-4 text-right">
+                            {t.type === 'lend' ? (
+                              <span className="inline-flex items-center gap-1.5 font-bold text-red-600">
+                                <ArrowDownLeft size={14} />
+                                ₹{t.amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                              </span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="p-4 text-right">
+                            {t.type === 'borrow' ? (
+                              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-600">
+                                <ArrowUpRight size={14} />
+                                ₹{t.amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                              </span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                              t.type === 'lend' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                            }`}>
+                              {t.type === 'lend' ? 'Debit' : 'Credit'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                              t.status === 'settled' ? 'bg-green-100 text-green-700' :
+                              t.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {t.status === 'settled' && <CheckCircle size={12} />}
+                              {t.status === 'pending' && <Clock size={12} />}
+                              {t.status === 'overdue' && <XCircle size={12} />}
+                              {t.status === 'settled' ? 'Settled' :
+                               t.status === 'pending' ? 'Pending' : 'Failed'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan="6" className="p-12 text-center text-slate-500">No transactions found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination for Ledger View */}
+              {filteredData.length > 0 && (
+                <div className="p-4 border-t border-slate-100">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalItems}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
+                </div>
               )}
             </div>
+          )}
 
-            {/* Desktop Table View */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                    <th className="p-4 text-left text-xs font-semibold text-slate-600 uppercase">Date</th>
-                    <th className="p-4 text-left text-xs font-semibold text-slate-600 uppercase">Description</th>
-                    <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase">Debit</th>
-                    <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase">Credit</th>
-                    <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase">Type</th>
-                    <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredData.length > 0 ? (
-                    filteredData.map((t) => (
-                      <tr key={t._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 text-slate-600 font-mono text-xs">
-                          {format(new Date(t.createdAt), 'MM/dd/yyyy')}
-                        </td>
-                        <td className="p-4">
-                          <div className="font-medium text-slate-800">{t.description}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">With: {getPartyName(t)}</div>
-                        </td>
-                        <td className="p-4 text-right">
-                          {t.type === 'lend' ? (
-                            <span className="inline-flex items-center gap-1.5 font-bold text-red-600">
-                              <ArrowDownLeft size={14} />
-                              ₹{t.amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                            </span>
-                          ) : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="p-4 text-right">
-                          {t.type === 'borrow' ? (
-                            <span className="inline-flex items-center gap-1.5 font-bold text-emerald-600">
-                              <ArrowUpRight size={14} />
-                              ₹{t.amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                            </span>
-                          ) : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            t.type === 'lend' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+          {/* SUMMARY VIEW */}
+          {viewMode === 'summary' && (
+            <div className="space-y-4">
+              {/* Key Metrics Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <TrendingUp size={20} className="text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">Total Debit</p>
+                      <p className="text-xl font-bold text-slate-800">₹{summary.totalDebit.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-emerald-100 rounded-lg">
+                      <TrendingDown size={20} className="text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">Total Credit</p>
+                      <p className="text-xl font-bold text-slate-800">₹{summary.totalCredit.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-purple-100 rounded-lg">
+                      <BarChart3 size={20} className="text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">Net Balance</p>
+                      <p className={`text-xl font-bold ${summary.netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ₹{Math.abs(summary.netBalance).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-amber-100 rounded-lg">
+                      <Clock size={20} className="text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase">Pending</p>
+                      <p className="text-xl font-bold text-amber-600">{summary.pendingCount}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Monthly Trend */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <h3 className="text-sm font-semibold text-slate-800 mb-4">Monthly Trend</h3>
+                <div className="space-y-3">
+                  {monthlyTrend.map((month, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">{month.month}</span>
+                        <span className="font-medium text-slate-800">
+                          ₹{(month.debit + month.credit).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="flex gap-1 h-2">
+                        <div 
+                          className="bg-red-500 rounded-l-full"
+                          style={{ width: `${(month.debit / (month.debit + month.credit || 1)) * 100}%` }}
+                        ></div>
+                        <div 
+                          className="bg-emerald-500 rounded-r-full"
+                          style={{ width: `${(month.credit / (month.debit + month.credit || 1)) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Debit: ₹{month.debit.toLocaleString('en-IN')}</span>
+                        <span>Credit: ₹{month.credit.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Party Type Breakdown */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <h3 className="text-sm font-semibold text-slate-800 mb-4">Transactions by Party Type</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                    <span className="text-sm text-blue-700">Registered Users</span>
+                    <span className="font-semibold text-blue-700">{userTransactions}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                    <span className="text-sm text-purple-700">External Parties</span>
+                    <span className="font-semibold text-purple-700">{externalTransactions}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TRANSACTIONS VIEW */}
+          {viewMode === 'transactions' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+                <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                  <List size={18} className="text-blue-600" />
+                  All Transactions ({filteredData.length})
+                </h2>
+              </div>
+              
+              {/* Transactions List */}
+              <div className="divide-y divide-slate-100">
+                {paginatedData.length > 0 ? (
+                  paginatedData.map((t) => (
+                    <div key={t._id} className="p-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-start gap-3">
+                            <div className={`p-2 rounded-lg ${
+                              t.type === 'lend' ? 'bg-red-100' : 'bg-emerald-100'
+                            }`}>
+                              {t.type === 'lend' 
+                                ? <ArrowDownLeft size={16} className="text-red-600" />
+                                : <ArrowUpRight size={16} className="text-emerald-600" />
+                              }
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-slate-800">{t.description || 'Transaction'}</h3>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                With: {getPartyName(t)} • {formatDisplayDate(t.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 sm:flex-col sm:items-end">
+                          <p className={`font-bold ${
+                            t.type === 'lend' ? 'text-red-600' : 'text-emerald-600'
                           }`}>
-                            {t.type === 'lend' ? 'Debit' : 'Credit'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            {t.type === 'lend' ? '-' : '+'}₹{t.amount.toFixed(2)}
+                          </p>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
                             t.status === 'settled' ? 'bg-green-100 text-green-700' :
                             t.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-red-100 text-red-700'
                           }`}>
-                            {t.status === 'settled' && <CheckCircle size={12} />}
-                            {t.status === 'pending' && <Clock size={12} />}
-                            {t.status === 'overdue' && <XCircle size={12} />}
-                            {t.status === 'settled' ? 'Settled' :
-                             t.status === 'pending' ? 'Pending' : 'Failed'}
+                            {t.status}
                           </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr><td colSpan="6" className="p-12 text-center text-slate-500">No transactions found</td></tr>
-                  )}
-                </tbody>
-              </table>
+                        </div>
+                      </div>
+                      
+                      {t.notes && (
+                        <p className="mt-3 text-xs text-slate-500 bg-slate-50 p-2 rounded">
+                          📝 {t.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-12 text-center text-slate-500">
+                    <List size={48} className="mx-auto text-slate-300 mb-3" />
+                    <p>No transactions found</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination for Transactions View */}
+              {filteredData.length > 0 && (
+                <div className="p-4 border-t border-slate-100">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalItems}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
-        {/* ACCOUNT LEDGER SUMMARY - Responsive */}
+        {/* ACCOUNT LEDGER SUMMARY SIDEBAR - This stays the same regardless of viewMode */}
         {(showSummary || showMobileSummary) && (
           <div className="lg:col-span-1 space-y-4">
             {/* Mobile Summary Header */}
@@ -418,7 +705,7 @@ const Ledger = () => {
               </div>
             </div>
 
-            {/* Stats Cards - Responsive Grid on Mobile */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
               {/* Settled Details Card */}
               <div className="bg-gradient-to-br from-emerald-700 to-emerald-800 rounded-xl shadow-lg overflow-hidden">
@@ -455,7 +742,7 @@ const Ledger = () => {
               </div>
             </div>
 
-            {/* Failed Card (if any) */}
+            {/* Failed Card */}
             {summary.failedCount > 0 && (
               <div className="bg-gradient-to-br from-red-600 to-red-700 rounded-xl shadow-lg overflow-hidden">
                 <div className="px-4 py-3 bg-red-500/30">
@@ -473,31 +760,33 @@ const Ledger = () => {
         )}
       </div>
 
-      {/* Legend - Responsive */}
-      <div className="mt-6 flex flex-wrap items-center gap-3 sm:gap-4 text-[10px] sm:text-xs bg-white p-3 rounded-lg border border-slate-200">
-        <span className="font-medium text-slate-700">Legend:</span>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 sm:w-3 sm:h-3 bg-green-100 rounded-full border border-green-300"></div>
-          <span className="text-slate-600">Settled</span>
+      {/* Legend - Only show in Ledger view */}
+      {viewMode === 'ledger' && (
+        <div className="mt-6 flex flex-wrap items-center gap-3 sm:gap-4 text-[10px] sm:text-xs bg-white p-3 rounded-lg border border-slate-200">
+          <span className="font-medium text-slate-700">Legend:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-green-100 rounded-full border border-green-300"></div>
+            <span className="text-slate-600">Settled</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-100 rounded-full border border-yellow-300"></div>
+            <span className="text-slate-600">Pending</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-red-100 rounded-full border border-red-300"></div>
+            <span className="text-slate-600">Failed</span>
+          </div>
+          <div className="hidden sm:block w-px h-4 bg-slate-200"></div>
+          <div className="flex items-center gap-1.5">
+            <ArrowDownLeft size={10} className="sm:w-3 sm:h-3 text-red-600" />
+            <span className="text-slate-600">Debit (You Lend)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ArrowUpRight size={10} className="sm:w-3 sm:h-3 text-emerald-600" />
+            <span className="text-slate-600">Credit (You Borrow)</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-100 rounded-full border border-yellow-300"></div>
-          <span className="text-slate-600">Pending</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 sm:w-3 sm:h-3 bg-red-100 rounded-full border border-red-300"></div>
-          <span className="text-slate-600">Failed</span>
-        </div>
-        <div className="hidden sm:block w-px h-4 bg-slate-200"></div>
-        <div className="flex items-center gap-1.5">
-          <ArrowDownLeft size={10} className="sm:w-3 sm:h-3 text-red-600" />
-          <span className="text-slate-600">Debit (You Lend)</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <ArrowUpRight size={10} className="sm:w-3 sm:h-3 text-emerald-600" />
-          <span className="text-slate-600">Credit (You Borrow)</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

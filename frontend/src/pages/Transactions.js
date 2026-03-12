@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { Filter, Search, CheckCircle, XCircle, Clock, ArrowUp, ArrowDown, ChevronDown, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import Pagination from '../components/Pagination'; // Add this import
 
 const Transactions = () => {
   const { token } = useAuth();
@@ -14,7 +15,11 @@ const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -33,31 +38,31 @@ const Transactions = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, API_URL]);
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
 
- const handleStatusUpdate = async (transactionId, newStatus) => {
-  setProcessingId(transactionId);
-  try {
-    const response = await axios.patch(
-      `${API_URL}/transactions/${transactionId}/status`,
-      { status: newStatus },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    
-    toast.success(response.data.message || `Transaction marked as ${newStatus}`);
-    fetchTransactions();
-  } catch (error) {
-    toast.error(error.response?.data?.message || 'Failed to update status');
-  } finally {
-    setProcessingId(null);
-    setShowConfirmModal(false);
-    setSelectedTransaction(null);
-  }
-};
+  const handleStatusUpdate = async (transactionId, newStatus) => {
+    setProcessingId(transactionId);
+    try {
+      const response = await axios.patch(
+        `${API_URL}/transactions/${transactionId}/status`,
+        { status: newStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      toast.success(response.data.message || `Transaction marked as ${newStatus}`);
+      fetchTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update status');
+    } finally {
+      setProcessingId(null);
+      setShowConfirmModal(false);
+      setSelectedTransaction(null);
+    }
+  };
 
   const openConfirmModal = (transaction) => {
     setSelectedTransaction(transaction);
@@ -69,6 +74,7 @@ const Transactions = () => {
     setSelectedTransaction(null);
   };
 
+  // Filter transactions
   const filteredTransactions = transactions.filter(transaction => {
     if (filter !== 'all' && transaction.status !== filter) return false;
     if (typeFilter !== 'all' && transaction.type !== typeFilter) return false;
@@ -85,6 +91,18 @@ const Transactions = () => {
     
     return true;
   });
+
+  // Pagination logic
+  const totalItems = filteredTransactions.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, typeFilter, searchTerm]);
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -183,15 +201,15 @@ const Transactions = () => {
           </div>
           
           <div className="text-right text-sm text-gray-600 flex items-center justify-end">
-            {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
+            {totalItems} transaction{totalItems !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
 
       {/* Transactions List - Responsive Card Layout */}
       <div className="space-y-3">
-        {filteredTransactions.length > 0 ? (
-          filteredTransactions.map((transaction) => (
+        {paginatedTransactions.length > 0 ? (
+          paginatedTransactions.map((transaction) => (
             <div key={transaction._id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex-1 min-w-0">
@@ -233,29 +251,29 @@ const Transactions = () => {
                 </p>
               )}
               
-           {transaction.status === 'pending' && (
-  <button
-    onClick={() => openConfirmModal(transaction)}
-    disabled={processingId === transaction._id}
-    className="mt-3 w-full sm:w-auto text-sm bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-  >
-    {processingId === transaction._id ? (
-      <>
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-        <span>Processing...</span>
-      </>
-    ) : (
-      <>
-        <CheckCircle size={16} />
-        <span>
-          {transaction.type === 'lend' 
-            ? 'Mark as Received' 
-            : 'Mark as Paid'}
-        </span>
-      </>
-    )}
-  </button>
-)}
+              {transaction.status === 'pending' && (
+                <button
+                  onClick={() => openConfirmModal(transaction)}
+                  disabled={processingId === transaction._id}
+                  className="mt-3 w-full sm:w-auto text-sm bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {processingId === transaction._id ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      <span>
+                        {transaction.type === 'lend' 
+                          ? 'Mark as Received' 
+                          : 'Mark as Paid'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           ))
         ) : (
@@ -271,86 +289,98 @@ const Transactions = () => {
         )}
       </div>
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={setItemsPerPage}
+        />
+      )}
+
       {/* Confirmation Modal */}
-    {showConfirmModal && selectedTransaction && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-      <div className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-green-100 rounded-full">
-            <CheckCircle size={24} className="text-green-600" />
+      {showConfirmModal && selectedTransaction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-green-100 rounded-full">
+                  <CheckCircle size={24} className="text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Confirm Settlement</h3>
+              </div>
+              
+              <div className="space-y-3 mb-6">
+                <p className="text-sm text-gray-600">
+                  {selectedTransaction.type === 'lend' 
+                    ? 'Have you received the money from the borrower?'
+                    : 'Have you paid the money to the lender?'}
+                </p>
+                
+                <div className="bg-gray-50 p-3 rounded-lg space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Description</span>
+                    <span className="text-sm font-medium">{selectedTransaction.description}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Amount</span>
+                    <span className={`text-sm font-bold ${
+                      selectedTransaction.type === 'lend' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {selectedTransaction.type === 'lend' ? '+' : '-'}₹{selectedTransaction.amount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">With</span>
+                    <span className="text-sm">
+                      {selectedTransaction.type === 'lend' 
+                        ? selectedTransaction.borrower?.name 
+                        : selectedTransaction.lender?.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Your Role</span>
+                    <span className="text-sm font-medium capitalize">
+                      {selectedTransaction.type === 'lend' ? 'Lender' : 'Borrower'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-gray-500">Date</span>
+                    <span className="text-sm">
+                      {format(new Date(selectedTransaction.createdAt), 'MMM dd, yyyy')}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    <span className="font-medium">Note:</span> By confirming, you acknowledge that this transaction has been settled. Both parties will see this transaction as completed.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={closeConfirmModal}
+                  className="flex-1 btn-secondary text-sm py-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleStatusUpdate(selectedTransaction._id, 'settled')}
+                  disabled={processingId === selectedTransaction._id}
+                  className="flex-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingId === selectedTransaction._id ? 'Processing...' : 'Yes, Mark as Settled'}
+                </button>
+              </div>
+            </div>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">Confirm Settlement</h3>
         </div>
-        
-        <div className="space-y-3 mb-6">
-          <p className="text-sm text-gray-600">
-            {selectedTransaction.type === 'lend' 
-              ? 'Have you received the money from the borrower?'
-              : 'Have you paid the money to the lender?'}
-          </p>
-          
-          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-            <div className="flex justify-between">
-              <span className="text-xs text-gray-500">Description</span>
-              <span className="text-sm font-medium">{selectedTransaction.description}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-gray-500">Amount</span>
-              <span className={`text-sm font-bold ${
-                selectedTransaction.type === 'lend' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {selectedTransaction.type === 'lend' ? '+' : '-'}₹{selectedTransaction.amount.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-gray-500">With</span>
-              <span className="text-sm">
-                {selectedTransaction.type === 'lend' 
-                  ? selectedTransaction.borrower?.name 
-                  : selectedTransaction.lender?.name}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-gray-500">Your Role</span>
-              <span className="text-sm font-medium capitalize">
-                {selectedTransaction.type === 'lend' ? 'Lender' : 'Borrower'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-gray-500">Date</span>
-              <span className="text-sm">
-                {format(new Date(selectedTransaction.createdAt), 'MMM dd, yyyy')}
-              </span>
-            </div>
-          </div>
-          
-          <div className="bg-blue-50 p-3 rounded-lg">
-            <p className="text-xs text-blue-700">
-              <span className="font-medium">Note:</span> By confirming, you acknowledge that this transaction has been settled. Both parties will see this transaction as completed.
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex gap-3">
-          <button
-            onClick={closeConfirmModal}
-            className="flex-1 btn-secondary text-sm py-2"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => handleStatusUpdate(selectedTransaction._id, 'settled')}
-            disabled={processingId === selectedTransaction._id}
-            className="flex-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {processingId === selectedTransaction._id ? 'Processing...' : 'Yes, Mark as Settled'}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 };

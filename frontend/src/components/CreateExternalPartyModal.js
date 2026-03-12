@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
   const { token } = useAuth();
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,6 +27,7 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
     tags: []
   });
   const [tagInput, setTagInput] = useState('');
+  const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,6 +44,13 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
       setFormData({
         ...formData,
         [name]: value
+      });
+    }
+    // Clear error for this field
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
       });
     }
   };
@@ -64,22 +72,75 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
     });
   };
 
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Validate Contact Type
+    if (!formData.type) {
+      newErrors.type = 'Please select a contact type';
+    }
+    
+    // Validate Name
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
+    // Validate Phone
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,10}$/.test(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+    
+    // Validate Email (if provided)
+    if (formData.email && formData.email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email address';
+      }
+    }
+    
+    return newErrors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error('Please fix the errors in the form');
+      return;
+    }
+    
     setLoading(true);
 
     try {
+      // Prepare data - remove empty email if it's just @ or empty
+      const submitData = {
+        ...formData,
+        // If email is empty or just @, send undefined (will be omitted)
+        email: formData.email && formData.email.trim() !== '' && formData.email !== '@' 
+          ? formData.email.trim() 
+          : undefined
+      };
+      
+      console.log('Submitting data:', submitData);
+
       const response = await axios.post(
         `${API_URL}/external-parties`,
-        formData,
+        submitData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      toast.success('Party created successfully!');
+      toast.success('Contact created successfully!');
       onPartyCreated(response.data.party);
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create party');
+      console.error('Creation error:', error);
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to create contact');
     } finally {
       setLoading(false);
     }
@@ -101,10 +162,10 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
-          {/* Type Selection */}
+          {/* Type Selection - Required */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contact Type
+              Contact Type <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {['individual', 'corporate', 'organization', 'other'].map((type) => (
@@ -127,9 +188,10 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
                 </label>
               ))}
             </div>
+            {errors.type && <p className="mt-1 text-xs text-red-500">{errors.type}</p>}
           </div>
 
-          {/* Basic Info */}
+          {/* Name - Required */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Name <span className="text-red-500">*</span>
@@ -141,18 +203,18 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="input-field pl-9 text-sm"
+                className={`input-field pl-9 text-sm ${errors.name ? 'border-red-500' : ''}`}
                 placeholder="Enter name"
-                required
               />
             </div>
+            {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
           </div>
 
           {(formData.type === 'corporate' || formData.type === 'organization') && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Company Name
+                  Company Name <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -169,7 +231,7 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Person
+                  Contact Person <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -190,7 +252,7 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
+                Email <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -199,15 +261,16 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="input-field pl-9 text-sm"
+                  className={`input-field pl-9 text-sm ${errors.email ? 'border-red-500' : ''}`}
                   placeholder="email@example.com"
                 />
               </div>
+              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone
+                Phone <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -216,17 +279,18 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="input-field pl-9 text-sm"
-                  placeholder="+1 234 567 8900"
+                  className={`input-field pl-9 text-sm ${errors.phone ? 'border-red-500' : ''}`}
+                  placeholder="+91 98765 43210"
                 />
               </div>
+              {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone}</p>}
             </div>
           </div>
 
-          {/* Address */}
+          {/* Address - Optional */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Address
+              Address <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <div className="space-y-3">
               <div className="relative">
@@ -281,10 +345,10 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
             </div>
           </div>
 
-          {/* Tags */}
+          {/* Tags - Optional */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags
+              Tags <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <div className="flex gap-2 mb-2">
               <div className="relative flex-1">
@@ -328,10 +392,10 @@ const CreateExternalPartyModal = ({ isOpen, onClose, onPartyCreated }) => {
             )}
           </div>
 
-          {/* Notes */}
+          {/* Notes - Optional */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes
+              Notes <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <textarea
               name="notes"

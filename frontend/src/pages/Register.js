@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Lock, UserPlus } from 'lucide-react';
+import { User, Mail, UserPlus } from 'lucide-react';
+import PasswordInput from '../components/PasswordInput';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -10,7 +11,6 @@ const Register = () => {
     password: '',
     confirmPassword: ''
   });
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -160,45 +160,27 @@ const Register = () => {
             {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white bg-opacity-90 ${
-                  errors.password ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Create a password"
-              />
-            </div>
-            {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
-          </div>
+          {/* Password field with eye toggle */}
+          <PasswordInput
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Create a password"
+            label="Password"
+            error={errors.password}
+            required={true}
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white bg-opacity-90 ${
-                  errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Confirm your password"
-              />
-            </div>
-            {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>}
-          </div>
+          {/* Confirm Password field with eye toggle */}
+          <PasswordInput
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            placeholder="Confirm your password"
+            label="Confirm Password"
+            error={errors.confirmPassword}
+            required={true}
+          />
 
           <button
             type="submit"

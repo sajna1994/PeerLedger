@@ -16,7 +16,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
-    const Backend_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  
+  // Fix: Use consistent naming
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const fetchProfile = useCallback(async () => {
     if (!token) {
@@ -25,7 +27,7 @@ export const AuthProvider = ({ children }) => {
     }
     
     try {
-      const response = await axios.get(`${Backend_URL}/auth/profile`, {
+      const response = await axios.get(`${API_URL}/auth/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUser(response.data);
@@ -35,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, API_URL]); // Add API_URL to dependencies
 
   useEffect(() => {
     fetchProfile();
@@ -43,9 +45,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post(`${Backend_URL}/auth/login`, {
+      const response = await axios.post(`${API_URL}/auth/login`, {
         email,
         password
+      }, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       const { token, user } = response.data;
@@ -55,6 +62,7 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login successful!');
       return true;
     } catch (error) {
+      console.error('Login error:', error);
       toast.error(error.response?.data?.message || 'Login failed');
       return false;
     }
@@ -62,10 +70,15 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password) => {
     try {
-      const response = await axios.post(`${Backend_URL}/auth/register`, {
+      const response = await axios.post(`${API_URL}/auth/register`, {
         name,
         email,
         password
+      }, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       const { token, user } = response.data;
@@ -75,6 +88,7 @@ export const AuthProvider = ({ children }) => {
       toast.success('Registration successful!');
       return true;
     } catch (error) {
+      console.error('Registration error:', error);
       toast.error(error.response?.data?.message || 'Registration failed');
       return false;
     }

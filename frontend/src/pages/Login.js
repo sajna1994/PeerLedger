@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, LogIn } from 'lucide-react';
+import { Mail, LogIn } from 'lucide-react';
+import PasswordInput from '../components/PasswordInput';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -10,7 +11,6 @@ const Login = () => {
   });
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const navigate = useNavigate();
 
@@ -35,7 +35,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Faded Background Logo - Using your actual image file */}
+      {/* Faded Background Logo */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
         <img 
           src="/peerledger-logo.png" 
@@ -96,23 +96,15 @@ const Login = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition bg-white bg-opacity-90"
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-          </div>
+          {/* Password field with eye toggle */}
+          <PasswordInput
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Enter your password"
+            label="Password"
+            required={true}
+          />
 
           <button
             type="submit"

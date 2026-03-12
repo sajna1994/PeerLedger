@@ -18,6 +18,7 @@ const externalPartySchema = new mongoose.Schema({
   },
   phone: {
     type: String,
+    required: true,  // ✅ Make phone required
     trim: true
   },
   companyName: {

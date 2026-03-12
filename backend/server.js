@@ -11,18 +11,50 @@ const externalPartyRoutes = require('./routes/externalParties');
 
 const app = express();
 
-// Middleware
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://gym-softwarefrontend.onrender.com']  // Update with your actual frontend URL
-    : 'http://localhost:3000'
-}));
+// ✅ CORS configuration - WITHOUT using wildcard route
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://gym-softwarefrontend.onrender.com'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+// Apply CORS middleware - DON'T use app.options('*')
+app.use(cors(corsOptions));
+
+// Handle OPTIONS requests for all routes with a middleware function (NOT a route)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.status(200).end();
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`📨 Incoming Request: ${req.method} ${req.url}`);
+  console.log(`📨 ${req.method} ${req.url}`);
+  console.log('  Origin:', req.headers.origin);
   console.log('  Auth Header:', req.headers.authorization ? 'Present' : 'Missing');
   next();
 });
@@ -53,7 +85,6 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.stack);
@@ -63,13 +94,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
+// 404 handler - use a function, not a wildcard string
 app.use((req, res) => {
-  console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
+  console.log(`❌ 404 - ${req.method} ${req.originalUrl}`);
   res.status(404).json({ 
     message: 'Route not found',
-    path: req.originalUrl,
-    method: req.method
+    path: req.originalUrl
   });
 });
 

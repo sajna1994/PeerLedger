@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Calendar, DollarSign, FileText, Building2, Plus } from 'lucide-react';
+import { ArrowLeft, Calendar,  FileText, Building2, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
 import CreateExternalPartyModal from '../components/CreateExternalPartyModal';
@@ -18,15 +18,15 @@ const CreateTransaction = () => {
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    type: 'lend',
+    type: '',
     otherPartyId: '',
-    otherPartyType: 'external', // Always 'external' now
+    otherPartyType: 'external',
     dueDate: '',
     notes: '',
     category: 'personal',
     tags: []
   });
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const fetchExternalParties = useCallback(async () => {
     try {
@@ -44,7 +44,7 @@ const CreateTransaction = () => {
       console.error('Failed to fetch external parties:', error);
       toast.error('Failed to load external parties');
     }
-  }, [token]);
+  }, [token, API_URL]);
 
   useEffect(() => {
     fetchExternalParties();
@@ -125,39 +125,59 @@ const CreateTransaction = () => {
     toast.success('External party created successfully!');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Validate required fields
+  if (!formData.type) {
+    toast.error('Please select transaction type');
+    return;
+  }
+  
+  if (!formData.otherPartyId) {
+    toast.error('Please select a party');
+    return;
+  }
+  
+  if (!formData.amount || parseFloat(formData.amount) <= 0) {
+    toast.error('Please enter a valid amount');
+    return;
+  }
+  
+  setLoading(true);
+  
+  try {
+    // Prepare data for backend
+    const transactionData = {
+      description: formData.description || 'Transaction', // Provide default if empty
+      amount: parseFloat(formData.amount),
+      type: formData.type,
+      otherPartyId: formData.otherPartyId,
+      otherPartyType: 'external', // Always external now
+      dueDate: formData.dueDate || null,
+      notes: formData.notes || '',
+      category: formData.category || 'personal',
+      tags: formData.tags || []
+    };
     
-    if (!formData.otherPartyId) {
-      toast.error('Please select a party');
-      return;
-    }
+    console.log('Sending transaction data:', transactionData); // Debug log
     
-    if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
+    await axios.post(
+      `${API_URL}/transactions`,
+      transactionData,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     
-    setLoading(true);
-    
-    try {
-      await axios.post(
-        `${API_URL}/transactions`,
-        {
-          ...formData,
-          amount: parseFloat(formData.amount)
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      toast.success('Transaction created successfully!');
-      navigate('/transactions');
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create transaction');
-    } finally {
-      setLoading(false);
-    }
-  };
+    toast.success('Transaction created successfully!');
+    navigate('/ledger');
+  } catch (error) {
+    console.error('Transaction creation error:', error);
+    console.error('Error response:', error.response?.data); // Log the actual error
+    toast.error(error.response?.data?.message || 'Failed to create transaction');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Combine external parties with search results
   const allOptions = [
@@ -204,14 +224,13 @@ const CreateTransaction = () => {
       <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Create New Transaction</h1>
-          
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {/* Transaction Type */}
+          {/* Transaction Type - Required */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Transaction Type
+              Transaction Type <span className="text-red-500">*</span>
             </label>
             <div className="flex flex-col sm:flex-row gap-3">
               <label className="flex-1">
@@ -222,6 +241,7 @@ const CreateTransaction = () => {
                   checked={formData.type === 'lend'}
                   onChange={handleChange}
                   className="sr-only"
+                  required
                 />
                 <div className={`text-center p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
                   formData.type === 'lend'
@@ -241,6 +261,7 @@ const CreateTransaction = () => {
                   checked={formData.type === 'borrow'}
                   onChange={handleChange}
                   className="sr-only"
+                  required
                 />
                 <div className={`text-center p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
                   formData.type === 'borrow'
@@ -254,7 +275,7 @@ const CreateTransaction = () => {
             </div>
           </div>
 
-          {/* Party Selection */}
+          {/* Party Selection - Required */}
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-medium text-gray-700">
@@ -338,10 +359,10 @@ const CreateTransaction = () => {
             </select>
           </div>
 
-          {/* Description */}
+          {/* Description - Now Optional */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description <span className="text-red-500">*</span>
+              Description <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <div className="relative">
               <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -352,36 +373,35 @@ const CreateTransaction = () => {
                 onChange={handleChange}
                 className="input-field pl-9 text-sm"
                 placeholder="e.g., Lunch, Invoice #123, Project payment"
+              />
+            </div>
+          </div>
+
+          {/* Amount - Required */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Amount (₹) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-medium text-lg">₹</span>
+              <input
+                type="number"
+                name="amount"
+                value={formData.amount}
+                onChange={handleChange}
+                className="input-field pl-9 text-sm"
+                placeholder="0.00"
+                step="0.01"
+                min="0.01"
                 required
               />
             </div>
           </div>
 
-          {/* Amount */}
-         <div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Amount (₹) <span className="text-red-500">*</span>
-  </label>
-  <div className="relative">
-    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-medium text-lg">₹</span>
-    <input
-      type="number"
-      name="amount"
-      value={formData.amount}
-      onChange={handleChange}
-      className="input-field pl-9 text-sm"
-      placeholder="0.00"
-      step="0.01"
-      min="0.01"
-      required
-    />
-  </div>
-</div>
-
           {/* Due Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Due Date (Optional)
+              Due Date <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -399,7 +419,7 @@ const CreateTransaction = () => {
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes (Optional)
+              Notes <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <textarea
               name="notes"

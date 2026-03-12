@@ -9,23 +9,24 @@ exports.createTransaction = async (req, res) => {
       amount, 
       type, 
       otherPartyId, 
-      otherPartyType, // 'user' or 'external'
+      otherPartyType,
       dueDate, 
       notes,
       category,
       tags 
     } = req.body;
 
+    // Set default description if not provided
+    const transactionDescription = description || 'Transaction';
+
     let lender, borrower, lenderModel, borrowerModel;
 
     if (type === 'lend') {
-      // Current user is lending
       lender = req.userId;
       lenderModel = 'User';
       borrower = otherPartyId;
       borrowerModel = otherPartyType === 'user' ? 'User' : 'ExternalParty';
     } else {
-      // Current user is borrowing
       lender = otherPartyId;
       lenderModel = otherPartyType === 'user' ? 'User' : 'ExternalParty';
       borrower = req.userId;
@@ -50,7 +51,7 @@ exports.createTransaction = async (req, res) => {
     }
 
     const transaction = new Transaction({
-      description,
+      description: transactionDescription, // Use default if empty
       amount,
       type,
       lender,
@@ -75,8 +76,12 @@ exports.createTransaction = async (req, res) => {
       transaction
     });
   } catch (error) {
-    console.error('Create transaction error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Create transaction error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
   }
 };
 

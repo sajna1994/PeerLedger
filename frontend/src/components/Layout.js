@@ -11,6 +11,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import Footer from './Footer'; // Import the Footer
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -27,7 +28,7 @@ const Layout = () => {
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/ledger', icon: BookOpen, label: 'Ledger' },
     { path: '/transactions', icon: Wallet, label: 'Transactions' },
-    { path: '/friends', icon: Users, label: 'Friends' },
+    { path: '/friends', icon: Users, label: 'Contacts' },
   ];
 
   const toggleMobileMenu = () => {
@@ -39,7 +40,7 @@ const Layout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white shadow-md z-30 px-4 py-3 flex justify-between items-center">
         {!logoError ? (
@@ -85,7 +86,7 @@ const Layout = () => {
               <img 
                 src="/peerledger-logo.png" 
                 alt="PeerLedger" 
-                className="h-16 lg:h-14 w-auto object-contain"
+                className="h-10 lg:h-14 w-auto object-contain"
                 onError={() => setLogoError(true)}
               />
             ) : (
@@ -129,13 +130,16 @@ const Layout = () => {
 
       {/* Main Content */}
       <main className={`
-        transition-all duration-300
+        transition-all duration-300 flex-1
         lg:ml-72 p-4 lg:p-8 pt-16 lg:pt-8
       `}>
         <div className="max-w-7xl mx-auto">
           <Outlet />
         </div>
       </main>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Floating Action Button - Mobile Optimized */}
       <button

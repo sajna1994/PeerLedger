@@ -3,10 +3,6 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/peerledger-logo.png" />
-    <!-- Or if you have an .ico file: -->
-    <!-- <link rel="icon" href="%PUBLIC_URL%/peerledger-logo.ico" /> -->
-    
-    <!-- Add additional favicon formats for better browser support -->
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/peerledger-logo.png" />
     <link rel="shortcut icon" href="%PUBLIC_URL%/peerledger-logo.png" type="image/x-icon" />
     
@@ -16,19 +12,12 @@
       name="description"
       content="PeerLedger - Track your borrows and lends with friends"
     />
-        <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>PeerLedger</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/service-worker.js');
-        });
-      }
-    </script>
+    <!-- Remove the inline service worker registration script -->
   </body>
 </html>
