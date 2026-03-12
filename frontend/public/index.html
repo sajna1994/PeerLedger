@@ -16,10 +16,19 @@
       name="description"
       content="PeerLedger - Track your borrows and lends with friends"
     />
+        <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
     <title>PeerLedger</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+     <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/service-worker.js');
+        });
+      }
+    </script>
   </body>
 </html>
